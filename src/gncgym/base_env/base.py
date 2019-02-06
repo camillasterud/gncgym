@@ -90,7 +90,7 @@ class BaseShipScenario(gym.Env, EzPickle):
 
         # TODO change the action space to match the boat actions
         # TODO create a reasonable observation space, current is image related
-        self.action_space = gym.spaces.Box(low=np.array([-1, 0]), high=np.array([+1, +1]), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=np.array([0, 0]), high=np.array([+1, +1]), dtype=np.float32)
         self.observation_space = gym.spaces.Box(low=OBS_SPACE[0, :], high=OBS_SPACE[1, :], dtype=np.float32)
 
     def step(self, action):

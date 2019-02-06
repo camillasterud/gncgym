@@ -141,6 +141,57 @@ class Vessel2D(EnvObject):
         else:
             viewer.draw_arrow(self.position, self.angle + pi + self.ref[1]/4, length=2)
 
+class AUV2D(EnvObject):
+    def __init__(self, init_angle, init_x, init_y, width=1.33, linearising_feedback=False):
+        self.lin_feedback = linearising_feedback
+        self.ref = [0, Angle(init_angle)]  # surge, heading
+
+        self.state = np.vstack((init_x, init_y, init_angle, 0, 0, 0))
+        self.model = make_auv_block(self.state, linearising_feedback=linearising_feedback)
+        self.path_taken = []
+        self.color = (0.6, 0.6, 0.6)
+        self.vertices = [
+            (-width, -width),
+            (-width, width),
+            (2 * width, width),
+            (3 * width, 0),
+            (2 * width, -width),
+        ]
+
+        super().__init__(radius=width, angle=init_angle, position=(init_x, init_y))
+
+    def surge(self, surge):
+        surge = np.clip(surge, 0, 1)
+        if self.lin_feedback:
+            self.ref[0] = np.clip(self.ref[0] + surge*SURGE_RATE, 0, MAX_SURGE)
+        else:
+            self.ref[0] = surge*(THRUST_MAX_AUV - THRUST_MIN_AUV) + THRUST_MIN_AUV
+
+    def steer(self, steer):
+        steer = np.clip(steer, 0, 1)
+        if self.lin_feedback:
+            self.ref[1] = float(Angle(self.ref[1] + steer * RUDDER_RATE))
+        else:
+            self.ref[1] = steer*(RUDDER_MAX_AUV - RUDDER_MIN_AUV) + RUDDER_MIN_AUV
+
+    def step(self):
+        self.state = self.model(self.ref)
+        self.position = tuple(self.state[0:2, :].flatten())
+        self.angle = float(self.state[2])
+        self.linearVelocity = tuple(self.state[3:5].flatten())
+        self.angularVelocity = float(self.state[5])
+
+        if self.path_taken == [] or distance(self.position, self.path_taken[-1]) > 3:
+            self.path_taken.append(self.position)
+
+    def draw(self, viewer):
+        viewer.draw_polyline(self.path_taken, linewidth=3, color=(0.8, 0, 0))  # previous positions
+        viewer.draw_shape(self.vertices, self.position, self.angle, self.color)  # ship
+        if self.lin_feedback:
+            viewer.draw_arrow(self.position, self.ref[1], length=5)  # reference
+        else:
+            viewer.draw_arrow(self.position, self.angle + pi + self.ref[1]/4, length=2)
+
 
 # TODO Needs new models for stepping, and 3D rendering
 class Vessel3D(EnvObject):
