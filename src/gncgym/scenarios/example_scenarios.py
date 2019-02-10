@@ -2,7 +2,7 @@ import numpy as np
 from numpy import sin, cos
 from gncgym.base_env.base import BaseShipScenario
 from gncgym.parametrised_curves import RandomLineThroughOrigin, RandomCurveThroughOrigin, ParamCircle, ParamLine
-from gncgym.base_env.objects import Vessel2D, StaticObstacle, DynamicObstacle, distance, MAX_SURGE, CROSS_TRACK_TOL, SURGE_TOL
+from gncgym.base_env.objects import Vessel2D, AUV2D, StaticObstacle, DynamicObstacle, distance, MAX_SURGE, CROSS_TRACK_TOL, SURGE_TOL
 
 
 class ExampleScenario(BaseShipScenario):
@@ -21,6 +21,18 @@ class ExampleScenario(BaseShipScenario):
         self.dynamic_obstacles.append(
             DynamicObstacle(self.path, speed=4, init_s=50)
         )
+
+class StraightPathScenarioAUV(BaseShipScenario):
+    def generate(self, rng):
+        self.path = RandomLineThroughOrigin(rng, length=500)
+        self.speed = 4
+
+        x, y = self.path(0)
+        angle = self.path.get_angle(0)
+        x += 2*(rng.rand()-0.5)
+        y += 2*(rng.rand()-0.5)
+        angle += 0.1*(rng.rand()-0.5)
+        self.ship = AUV2D(angle, x, y)
 
 
 class StraightPathScenario(BaseShipScenario):

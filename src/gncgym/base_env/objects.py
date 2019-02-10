@@ -3,6 +3,8 @@ from numpy import pi, sin, cos
 from gncgym.simulator.angle import Angle
 from gncgym.utils import distance
 from gncgym.models.supply_ship_3DOF import make_supply_ship_block
+from gncgym.models.supply_ship_3DOF.AUV import make_auv_block
+
 import gncgym.simulator as sim
 
 # Top-down ship dynamics simulation.
@@ -27,6 +29,9 @@ THRUST_MAX = 10000000
 RUDDER_MIN = pi
 RUDDER_MAX = -pi
 
+THRUST_MIN_AUV = 0
+THRUST_MAX_AUV = 3.6
+RUDDER_MAX_AUV = 17/225*pi
 
 class EnvObject:
     def __init__(self, radius, angle=0.0, position=(0.0, 0.0), linearVelocity=(0.0, 0.0), angularVelocity=0):
@@ -142,7 +147,7 @@ class Vessel2D(EnvObject):
             viewer.draw_arrow(self.position, self.angle + pi + self.ref[1]/4, length=2)
 
 class AUV2D(EnvObject):
-    def __init__(self, init_angle, init_x, init_y, width=1.33, linearising_feedback=False):
+    def __init__(self, init_angle, init_x, init_y, width=2, linearising_feedback=False):
         self.lin_feedback = linearising_feedback
         self.ref = [0, Angle(init_angle)]  # surge, heading
 
@@ -172,10 +177,11 @@ class AUV2D(EnvObject):
         if self.lin_feedback:
             self.ref[1] = float(Angle(self.ref[1] + steer * RUDDER_RATE))
         else:
-            self.ref[1] = steer*(RUDDER_MAX_AUV - RUDDER_MIN_AUV) + RUDDER_MIN_AUV
+            self.ref[1] = steer*RUDDER_MAX_AUV
 
     def step(self):
         self.state = self.model(self.ref)
+        #print(f"x: {self.state[0]}\n y: {self.state[1]} \n psi: {self.state[2]}\n")
         self.position = tuple(self.state[0:2, :].flatten())
         self.angle = float(self.state[2])
         self.linearVelocity = tuple(self.state[3:5].flatten())

@@ -48,6 +48,11 @@ try:
         entry_point='gncgym.scenarios.example_scenarios:CurvedPathStaticDynamicObstacles',
     )
 
+    register(
+        id='shipStraightPathFollowingAUV-v0',
+        entry_point='gncgym.scenarios.example_scenarios:StraightPathScenarioAUV',
+    )
+
 except GymError as e:
     print(e)
 
