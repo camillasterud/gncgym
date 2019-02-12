@@ -49,8 +49,12 @@ try:
     )
 
     register(
-        id='shipStraightPathFollowingAUV-v0',
+        id='AUVStraightPathFollowing-v0',
         entry_point='gncgym.scenarios.example_scenarios:StraightPathScenarioAUV',
+    )
+    register(
+        id='AUVCurvedPathFollowing-v0',
+        entry_point='gncgym.scenarios.example_scenarios:CurvedPathScenarioAUV',
     )
 
 except GymError as e:

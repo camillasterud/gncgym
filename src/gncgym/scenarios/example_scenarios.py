@@ -48,6 +48,23 @@ class StraightPathScenario(BaseShipScenario):
         self.ship = Vessel2D(angle, x, y)
 
 
+class CurvedPathScenarioAUV(BaseShipScenario):
+    def __init__(self):
+        super().__init__()
+
+    def generate(self, rng):
+        L = 400
+        a = 2*np.pi*(rng.rand()-0.5)
+        self.path = RandomCurveThroughOrigin(rng, start=((L*cos(a), L*sin(a))))
+        self.speed = 4
+
+        x, y = self.path(0)
+        angle = self.path.get_angle(0)
+        x += 2*(rng.rand()-0.5)
+        y += 2*(rng.rand()-0.5)
+        angle += 0.1*(rng.rand()-0.5)
+        self.ship = AUV2D(angle, x, y)
+
 class CurvedPathScenario(BaseShipScenario):
     def __init__(self, linearising_feedback=True):
         self.linFB = linearising_feedback
