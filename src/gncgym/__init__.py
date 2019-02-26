@@ -56,6 +56,10 @@ try:
         id='AUVCurvedPathFollowing-v0',
         entry_point='gncgym.scenarios.example_scenarios:CurvedPathScenarioAUV',
     )
+    register(
+        id='AUVCurvedPathStaticObstacles-v0',
+        entry_point='gncgym.scenarios.example_scenarios:CurvedPathStaticObstaclesAUV',
+    )
 
 except GymError as e:
     print(e)

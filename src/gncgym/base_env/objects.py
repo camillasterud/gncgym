@@ -17,7 +17,7 @@ import gncgym.simulator as sim
 #
 # Created by Haakon Robinson.
 
-MAX_SURGE = 20
+MAX_SURGE = 5
 CROSS_TRACK_TOL = 10
 SURGE_TOL = 0.5
 
@@ -30,8 +30,8 @@ RUDDER_MIN = pi
 RUDDER_MAX = -pi
 
 THRUST_MIN_AUV = 0
-THRUST_MAX_AUV = 3.6
-RUDDER_MAX_AUV = 17/225*pi
+THRUST_MAX_AUV = 10
+RUDDER_MAX_AUV = 0.1
 
 class EnvObject:
     def __init__(self, radius, angle=0.0, position=(0.0, 0.0), linearVelocity=(0.0, 0.0), angularVelocity=0):
@@ -173,7 +173,7 @@ class AUV2D(EnvObject):
             self.ref[0] = surge*(THRUST_MAX_AUV - THRUST_MIN_AUV) + THRUST_MIN_AUV
 
     def steer(self, steer):
-        steer = np.clip(steer, 0, 1)
+        steer = np.clip(steer, -1, 1)
         if self.lin_feedback:
             self.ref[1] = float(Angle(self.ref[1] + steer * RUDDER_RATE))
         else:
