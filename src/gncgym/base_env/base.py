@@ -4,7 +4,6 @@ import numpy as np
 from numpy import pi, sin, cos, arctan2
 from gncgym import simulator as sim
 
-from . import rendering
 from .objects import MAX_SURGE
 from gncgym.utils import distance, rotate
 from gym.utils import seeding, EzPickle
@@ -427,6 +426,7 @@ class BaseShipScenario(gym.Env, EzPickle):
         return arr
 
     def _init_viewer(self):
+        from . import rendering
         self.viewer = rendering.Viewer(WINDOW_W, WINDOW_H)
         self.score_label = pyglet.text.Label('0000', font_size=36,
                                              x=20, y=WINDOW_H * 2.5 / 40.00, anchor_x='left', anchor_y='center',
