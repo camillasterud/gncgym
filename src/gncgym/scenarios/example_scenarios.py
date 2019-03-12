@@ -1,8 +1,10 @@
 import numpy as np
-from numpy import sin, cos
-from gncgym.base_env.base import BaseShipScenario
+from numpy import pi, sin, cos, arctan2
+from gncgym.base_env.base import BaseShipScenario, NS, OBST_RANGE, LOS_DISTANCE
 from gncgym.parametrised_curves import RandomLineThroughOrigin, RandomCurveThroughOrigin, ParamCircle, ParamLine
 from gncgym.base_env.objects import Vessel2D, AUV2D, StaticObstacle, DynamicObstacle, distance, MAX_SURGE, CROSS_TRACK_TOL, SURGE_TOL
+from gncgym.simulator.angle import Angle
+from gncgym.utils import distance, rotate
 
 
 class ExampleScenario(BaseShipScenario):
@@ -304,10 +306,18 @@ class CurvedPathScenarioAUV(BaseShipScenario):
 
 class CurvedPathStaticObstaclesAUV(BaseShipScenario):
     def generate(self, rng):
+        from gym.utils import seeding
+        if self.config["randomness"]:
+            rng = self.np_random
+            rng_path = rng
+        else:
+            rng, seed = seeding.np_random(5)
+            rng_path = None
         L = 400
         a = 2 * np.pi * (rng.rand() - 0.5)
-        self.path = RandomCurveThroughOrigin(rng, start=((L * cos(a), L * sin(a))))
-        self.speed = 4
+        self.path = RandomCurveThroughOrigin(rng=rng_path, start=((L * cos(a), L * sin(a))))
+        self.speed = 1.5
+        self.max_speed = 1.8
 
         x, y = self.path(0)
         angle = self.path.get_angle(0)
@@ -315,62 +325,86 @@ class CurvedPathStaticObstaclesAUV(BaseShipScenario):
         y += 2*(rng.rand()-0.5)
         angle += 0.1*(rng.rand()-0.5)
         self.ship = AUV2D(angle, x, y, linearising_feedback=False)
+        num_obs = self.config["num_obstacles"]
 
-        for i in range(10):
+        for i in range(num_obs):
             self.static_obstacles.append(StaticObstacle(
                 self.path(0.9*self.path.length*(rng.rand() + 0.1)).flatten() + 100*(rng.rand(2)-0.5), radius=10*(rng.rand()+0.5) ))
 
     def step_reward(self, action, obs, ds):
         done = False
-        x, y = self.ship.position
         step_reward = 0
 
-        # Living penalty
-        # step_reward -= 0.001  # TODO Increase living penalty
-
-        if not done and self.reward < -250:
+        if not done and self.reward < -300:
             done = True
 
         if not done and abs(self.s - self.path.length) < 1:
             done = True
 
-        for o in self.static_obstacles + self.dynamic_obstacles:
-            if not done and distance(self.ship.position, o.position) < self.ship.radius + o.radius:
-                done = True
-                step_reward -= 50
-                break
+        #for o in self.static_obstacles + self.dynamic_obstacles:
+        #    if not done and distance(self.ship.position, o.position) < self.ship.radius + o.radius:
+        #        done = True
+        #        step_reward += self.config["reward_collision"]
+        #        break
 
         if not done and distance(self.ship.position, self.path.get_endpoint()) < 20:
             done = True
-            # step_reward += 50
 
-        if not done:  # Reward progress along path, penalise backwards progress
-            step_reward += 2*ds
+        if not done:
+            step_reward += ds*self.config["reward_ds"]
 
-        if not done:  # Penalise cross track error if too far away from path
-            # state_error = obs[:6]
-            # step_reward += (0.2 - np.clip(np.linalg.norm(state_error), 0, 0.4))/100
-            # heading_err = state_error[2]
-            # surge_err = state_error[3]
-            # TODO Punish for facing wrong way / Reward for advancing along path
+        for i, slot in self.active_static.items():
+            closeness = obs[NS + 2*slot + 1]
+            step_reward += self.config["reward_closeness"]*closeness**2
 
-            for i, slot in self.active_static.items():
-                closeness = obs[4 + 2*slot + 1]
-                step_reward -= 0.2*closeness**2
+        if not done: 
 
-            surge_error = obs[0]
+            surge_error = obs[0] - self.speed/self.max_speed
             cross_track_error = obs[2]
 
-            # step_reward -= abs(cross_track_error)*0.1
-            # step_reward -= max(0, -surge_error)*0.1
-
-            step_reward -= abs(cross_track_error)*0.5 + max(0, -surge_error)*0.5
-
-            # step_reward -= (max(0.1, -obs[0]) - 0.1)*0.3
-            # dist_from_path = np.sqrt(x_err ** 2 + y_err ** 2)
-            # path_angle = self.path.get_angle(self.s)
-            # If the reference is pointing towards the path, don't penalise
-            # if dist_from_path > 0.25 and sign(float(Angle(path_angle - self.ship.ref[1]))) == sign(y_err):
-            #     step_reward -= 0.1*(dist_from_path - 0.25)
+            step_reward += abs(cross_track_error)*self.config["reward_cross_track_error"]
+            step_reward += max(0, -surge_error)*self.config["reward_surge_error"]
 
         return done, step_reward
+
+    def navigate(self, state=None):
+        LOS_DISTANCE = 25
+        OBST_RANGE = 150
+        if state is None:
+            state = self.ship.state.flatten()
+
+        self.update_closest_obstacles()
+
+        # TODO Try lookahead vector instead of closest point
+        closest_point = self.path(self.s).flatten()
+        closest_angle = self.path.get_angle(self.s)
+        target = self.path(self.s + LOS_DISTANCE).flatten()
+        target_angle = self.path.get_angle(self.s + LOS_DISTANCE)
+
+        # State and path errors
+        surge_error = self.speed - state[3]
+        heading_error = float(Angle(target_angle - state[2]))
+        cross_track_error = rotate(closest_point - self.ship.position, -closest_angle)[1]
+        target_dist = distance(self.ship.position, target)
+
+        # Construct observation vector
+        obs = np.zeros((NS + 2*4,))
+
+
+        obs[0] = np.clip((state[3]**2 + state[4]**2) /self.max_speed, 0, 1)
+        #obs[1] = np.clip(state[4]/0.2, -1, 1)
+        obs[2] = np.clip(heading_error / pi, -1, 1)
+        obs[3] = np.clip(cross_track_error / LOS_DISTANCE, -1, 1)
+        obs[4] = np.clip(self.last_action[0], -1, 1)
+        obs[5] = np.clip(self.last_action[1], 0, 1)
+
+        #obs[4] = np.clip((target_dist - LOS_DISTANCE)/LOS_DISTANCE, 0, 1)
+
+        # Write static obstacle data into observation
+        for i, slot in self.active_static.items():
+            obst = self.static_obstacles[i]
+            vec = obst.position - self.ship.position
+            obs[NS + 2*slot] = float(Angle(arctan2(vec[1], vec[0]) - self.ship.angle))/pi
+            obs[NS + 2*slot + 1] = 1 - np.clip((np.linalg.norm(vec) - self.ship.radius - obst.radius) / OBST_RANGE, 0, 1)
+
+        return obs

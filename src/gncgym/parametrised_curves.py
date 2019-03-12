@@ -166,6 +166,9 @@ class RandomLineThroughOrigin(ParamLine):
 
 class RandomCurveThroughOrigin(ParamCurve):
     def __init__(self, rng, start, end=None):
+        if not rng:
+            from gym.utils import seeding
+            rng, seed = seeding.np_random(5)
         p = []
         if end is None:
             end = -np.array(start)

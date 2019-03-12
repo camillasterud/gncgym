@@ -37,7 +37,7 @@ OBST_PENALTY = 25
 DETECTED_OBST_COLOR = (0.1, 0.7, 0.2)
 
 NR = 0  # Number of elements in reference obs
-NS = 4  # Number of elements in state obs
+NS = 5  # Number of elements in state obs
 STATIC_OBST_SLOTS = 4
 DYNAMIC_OBST_SLOTS = 0
 
@@ -60,10 +60,10 @@ class BaseShipScenario(gym.Env, EzPickle):
         'video.frames_per_second': FPS
     }
 
-    def __init__(self):
+    def __init__(self, env_config):
         self.t = sim.init(
             solver='fixed_step',
-            step_size=0.05,
+            step_size=0.1,
         )
 
         self.viewer = None
@@ -75,6 +75,7 @@ class BaseShipScenario(gym.Env, EzPickle):
         self.speed = None
         self.ship = None
         self.last_obs = None
+        self.last_action = [0, 0]
 
         self.static_obstacles = None
         self.dynamic_obstacles = None
@@ -85,6 +86,8 @@ class BaseShipScenario(gym.Env, EzPickle):
         self.reward = None
         self.np_random = None
 
+        self.config = env_config
+
         self.reset()
 
         # TODO change the action space to match the boat actions
@@ -93,6 +96,7 @@ class BaseShipScenario(gym.Env, EzPickle):
         self.observation_space = gym.spaces.Box(low=OBS_SPACE[0, :], high=OBS_SPACE[1, :], dtype=np.float32)
 
     def step(self, action):
+        self.last_action = action
         self.ship.steer(action[0])
         self.ship.surge(action[1])
 
@@ -338,7 +342,7 @@ class BaseShipScenario(gym.Env, EzPickle):
     def destroy(self):
         pass
 
-    def seed(self, seed=None):
+    def seed(self, seed=5):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
