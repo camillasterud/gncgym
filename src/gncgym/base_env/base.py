@@ -60,7 +60,7 @@ class BaseShipScenario(gym.Env, EzPickle):
         'video.frames_per_second': FPS
     }
 
-    def __init__(self, env_config):
+    def __init__(self, env_config=None):
         self.t = sim.init(
             solver='fixed_step',
             step_size=0.1,

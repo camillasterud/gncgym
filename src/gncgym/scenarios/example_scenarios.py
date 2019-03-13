@@ -326,6 +326,7 @@ class CurvedPathStaticObstaclesAUV(BaseShipScenario):
         angle += 0.1*(rng.rand()-0.5)
         self.ship = AUV2D(angle, x, y, linearising_feedback=False)
         num_obs = self.config["num_obstacles"]
+        self.num_sectors = self.config["num_sectors"]
 
         for i in range(num_obs):
             self.static_obstacles.append(StaticObstacle(
@@ -388,23 +389,24 @@ class CurvedPathStaticObstaclesAUV(BaseShipScenario):
         target_dist = distance(self.ship.position, target)
 
         # Construct observation vector
-        obs = np.zeros((NS + 2*4,))
+        obs = np.zeros((NS + self.num_sectors,))
 
 
         obs[0] = np.clip((state[3]**2 + state[4]**2) /self.max_speed, 0, 1)
-        #obs[1] = np.clip(state[4]/0.2, -1, 1)
-        obs[2] = np.clip(heading_error / pi, -1, 1)
-        obs[3] = np.clip(cross_track_error / LOS_DISTANCE, -1, 1)
-        obs[4] = np.clip(self.last_action[0], -1, 1)
-        obs[5] = np.clip(self.last_action[1], 0, 1)
+        obs[1] = np.clip(heading_error / pi, -1, 1)
+        obs[2] = np.clip(cross_track_error / LOS_DISTANCE, -1, 1)
+        obs[3] = np.clip(self.last_action[0], -1, 1)
+        obs[4] = np.clip(self.last_action[1], 0, 1)
 
-        #obs[4] = np.clip((target_dist - LOS_DISTANCE)/LOS_DISTANCE, 0, 1)
-
-        # Write static obstacle data into observation
-        for i, slot in self.active_static.items():
-            obst = self.static_obstacles[i]
-            vec = obst.position - self.ship.position
-            obs[NS + 2*slot] = float(Angle(arctan2(vec[1], vec[0]) - self.ship.angle))/pi
-            obs[NS + 2*slot + 1] = 1 - np.clip((np.linalg.norm(vec) - self.ship.radius - obst.radius) / OBST_RANGE, 0, 1)
+        distance_vecs = {i: (self.ship.position - obst.position) for i, obst in enumerate(self.static_obstacles)}
+        for obsti, obst in enumerate(self.static_obstacles):
+            vec = distance_vecs[obsti]
+            dist = np.linalg.norm(vec)
+            if dist < OBST_RANGE:
+                ang = (float(Angle(arctan2(vec[1], vec[0]) - self.ship.angle)) + pi/2)/pi
+                if 0 <= ang < 1:
+                    closeness = 1 - np.clip((dist - self.ship.radius - obst.radius) / OBST_RANGE, 0, 1)
+                    if obs[np.floor(ang*self.num_sectors)] > closeness:
+                        obs[NS + np.floor(ang*self.num_sectors)] = closeness
 
         return obs
